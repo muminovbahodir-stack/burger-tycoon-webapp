@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Burger Tycoon MAX WebApp</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{
+  --bg:#111318; --card:#1d212b; --card2:#252a36; --text:#f7f7f7;
+  --muted:#a9b0c2; --accent:#ffb703; --good:#4ade80; --bad:#fb7185;
+  --blue:#60a5fa; --purple:#c084fc;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:linear-gradient(160deg,#10131a,#1d2433);color:var(--text);padding:14px}
+h1,h2,h3{margin:8px 0} p{color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.card{background:rgba(29,33,43,.92);border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:14px;margin:10px 0;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+.stat{background:var(--card2);border-radius:14px;padding:10px;text-align:center}
+button{width:100%;border:0;border-radius:14px;padding:12px;margin:5px 0;font-size:15px;font-weight:700;color:#111;background:var(--accent)}
+button:active{transform:scale(.97)}
+.btn2{background:var(--blue)} .btn3{background:var(--good)} .btn4{background:var(--purple)} .btnBad{background:var(--bad)}
+.food{background:#fff;color:#111;min-height:54px}
+.small{font-size:13px;color:var(--muted)} .hidden{display:none}
+.badge{display:inline-block;padding:5px 9px;border-radius:999px;background:rgba(255,255,255,.1);margin:3px}
+.orderBox{border:2px solid rgba(255,183,3,.55);background:rgba(255,183,3,.08)}
+.progress{width:100%;height:12px;background:#333b4a;border-radius:999px;overflow:hidden}
+.progress div{height:100%;background:var(--accent);width:100%}
+input{width:100%;padding:13px;border-radius:12px;border:1px solid rgba(255,255,255,.14);background:#161a22;color:white;font-size:16px}
+.nav{position:sticky;bottom:0;background:rgba(17,19,24,.94);backdrop-filter:blur(8px);padding:8px;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;border-radius:18px}
+.nav button{font-size:12px;padding:10px;margin:0}
+</style>
+</head>
+<body>
+<h1>🍔 Burger Tycoon MAX</h1>
+<p id="hello">Загрузка...</p>
+
+<div class="grid">
+  <div class="stat">💰 <b id="coins">0</b><br><span class="small">монеты</span></div>
+  <div class="stat">⭐ <b id="level">1</b><br><span class="small">уровень</span></div>
+  <div class="stat">🏅 <b id="rep">50</b><br><span class="small">репутация</span></div>
+  <div class="stat">🔥 <b id="streak">0</b><br><span class="small">серия</span></div>
+</div>
+
+<section id="home" class="page">
+  <div class="card">
+    <h2>🏪 Ресторан</h2>
+    <p>Принимай клиентов, собирай заказ, следи за временем и складом.</p>
+    <button onclick="newCustomer()">👤 Новый клиент</button>
+  </div>
+  <div id="activeOrder" class="card orderBox hidden"></div>
+  <div class="card">
+    <h2>🍽 Меню</h2>
+    <div id="foodButtons" class="grid"></div>
+    <button class="btn3" onclick="serveOrder()">✅ Отдать заказ</button>
+    <button class="btnBad" onclick="clearSelected()">🗑 Очистить выбранное</button>
+  </div>
+</section>
+
+<section id="stockPage" class="page hidden">
+  <div class="card"><h2>📦 Склад</h2><div id="stockList"></div></div>
+  <div class="card"><h2>🛒 Закупка</h2><div id="buyButtons"></div></div>
+</section>
+
+<section id="upgradePage" class="page hidden">
+  <div class="card">
+    <h2>⚙️ Апгрейды</h2>
+    <button onclick="buyUpgrade('kitchen')">🔥 Быстрая кухня</button>
+    <button onclick="buyUpgrade('cashier')">🙂 Кассир</button>
+    <button onclick="buyUpgrade('ads')">📣 Реклама</button>
+    <button onclick="buyUpgrade('storage')">📦 Большой склад</button>
+  </div>
+  <div class="card">
+    <h2>🎁 Промокод</h2>
+    <input id="promoInput" placeholder="Например START">
+    <button class="btn4" onclick="usePromo()">Активировать</button>
+    <p class="small">Промокоды: START, BURGER, TYCOON, STOCK</p>
+  </div>
+</section>
+
+<section id="profilePage" class="page hidden">
+  <div class="card"><h2>🎮 Профиль</h2><div id="profileText"></div></div>
+  <div class="card"><h2>🏆 Квесты</h2><div id="questsText"></div></div>
+</section>
+
+<div class="nav">
+  <button onclick="showPage('home')">🍔 Игра</button>
+  <button onclick="showPage('stockPage')">📦 Склад</button>
+  <button onclick="showPage('upgradePage')">⚙️ Улучш.</button>
+  <button onclick="showPage('profilePage')">🎮 Проф.</button>
+</div>
+
+<script>
+const tg = window.Telegram?.WebApp;
+if(tg){ tg.expand(); }
+
+const foods = {
+  "🍔 Бургер": {price:80, xp:15, need:{bun:1, meat:1, sauce:1}, level:1},
+  "🧀 Сырный бургер": {price:110, xp:20, need:{bun:1, meat:1, cheese:1, sauce:1}, level:1},
+  "🍟 Картошка": {price:55, xp:10, need:{potato:1, sauce:1}, level:1},
+  "🥤 Кола": {price:40, xp:8, need:{drink:1}, level:1},
+  "🍕 Пицца": {price:140, xp:25, need:{dough:1, cheese:1, sauce:1}, level:2},
+  "🌭 Хот-дог": {price:95, xp:18, need:{bun:1, meat:1, sauce:1}, level:2},
+  "🌮 Тако": {price:130, xp:24, need:{dough:1, meat:1, veggie:1, sauce:1}, level:3},
+  "🍗 Наггетсы": {price:120, xp:22, need:{chicken:1, sauce:1}, level:3},
+  "🥗 Салат": {price:90, xp:20, need:{veggie:2, sauce:1}, level:4},
+  "🍩 Пончик": {price:75, xp:16, need:{dough:1, sugar:1}, level:4},
+  "🍦 Мороженое": {price:85, xp:18, need:{milk:1, sugar:1}, level:5},
+  "☕ Кофе": {price:70, xp:14, need:{coffee:1}, level:2},
+  "🧋 Бабл-ти": {price:150, xp:30, need:{milk:1, drink:1, sugar:1, tea:1}, level:6},
+  "🐟 Фишбургер": {price:160, xp:32, need:{bun:1, fish:1, sauce:1}, level:6},
+  "🥞 Панкейки": {price:155, xp:30, need:{dough:1, milk:1, egg:1, sugar:1}, level:7},
+  "🍛 Рис с курицей": {price:170, xp:35, need:{rice:1, chicken:1, sauce:1}, level:7}
+};
+
+const ingredients = {
+  bun:"Булочки", meat:"Мясо", cheese:"Сыр", potato:"Картошка", drink:"Напитки",
+  dough:"Тесто", veggie:"Овощи", sugar:"Сахар", milk:"Молоко", chicken:"Курица",
+  sauce:"Соус", coffee:"Кофе", tea:"Чай", fish:"Рыба", egg:"Яйца", rice:"Рис"
+};
+
+const ingredientPrices = {
+  bun:40, meat:70, cheese:55, potato:35, drink:35, dough:50, veggie:45,
+  sugar:30, milk:45, chicken:75, sauce:35, coffee:55, tea:40, fish:90, egg:45, rice:40
+};
+
+const clients = [
+  {name:"😎 обычный клиент", time:55, mult:1},
+  {name:"💰 богатый клиент", time:45, mult:1.7},
+  {name:"😡 злой клиент", time:25, mult:1.3},
+  {name:"👑 VIP клиент", time:35, mult:2.3},
+  {name:"🤓 студент", time:50, mult:.9},
+  {name:"📸 блогер", time:40, mult:2},
+  {name:"🧒 ребёнок", time:65, mult:.8},
+  {name:"🚕 водитель", time:30, mult:1.4},
+  {name:"🧳 турист", time:45, mult:1.5},
+  {name:"👵 бабушка", time:70, mult:1}
+];
+
+const phrases = ["можно мне", "хочу", "давай", "сделай", "срочно нужно", "пожалуйста"];
+const promos = {
+  START:{coins:500, stock:{}},
+  BURGER:{coins:300, stock:{bun:10, meat:10, sauce:10}},
+  TYCOON:{coins:2000, stock:{}},
+  STOCK:{coins:0, stock:{bun:20, meat:20, cheese:20, potato:20, drink:20, sauce:20}}
+};
+
+let game = loadGame();
+
+function defaultGame(){
+  const stock = {};
+  Object.keys(ingredients).forEach(k => stock[k]=8);
+  return {
+    coins:700, xp:0, level:1, rep:50, day:1,
+    orders:0, fails:0, streak:0, bestStreak:0,
+    kitchen:0, cashier:0, ads:0, storage:0,
+    stock, active:null, usedPromos:[], totalEarned:0
+  };
+}
+
+function saveGame(){ localStorage.setItem("burgerTycoonMax", JSON.stringify(game)); }
+function loadGame(){
+  try{
+    const raw = localStorage.getItem("burgerTycoonMax");
+    return raw ? JSON.parse(raw) : defaultGame();
+  }catch(e){ return defaultGame(); }
+}
+
+function showPage(id){
+  document.querySelectorAll(".page").forEach(p=>p.classList.add("hidden"));
+  document.getElementById(id).classList.remove("hidden");
+  renderAll();
+}
+
+function updateTop(){
+  document.getElementById("coins").textContent = game.coins;
+  document.getElementById("level").textContent = game.level;
+  document.getElementById("rep").textContent = game.rep;
+  document.getElementById("streak").textContent = game.streak;
+  const user = tg?.initDataUnsafe?.user;
+  document.getElementById("hello").textContent = user ? `Игрок: ${user.first_name}` : "Игрок без регистрации";
+}
+
+function unlockedFoods(){ return Object.keys(foods).filter(f => foods[f].level <= game.level); }
+
+function renderFoods(){
+  const box = document.getElementById("foodButtons");
+  box.innerHTML = "";
+  unlockedFoods().forEach(food => {
+    const b = document.createElement("button");
+    b.className = "food";
+    b.textContent = food;
+    b.onclick = () => chooseFood(food);
+    box.appendChild(b);
+  });
+}
+
+function renderStock(){
+  const list = document.getElementById("stockList");
+  list.innerHTML = "";
+  Object.keys(ingredients).forEach(k=>{
+    const amount = game.stock[k] || 0;
+    const color = amount <= 2 ? "🔴" : amount <= 6 ? "🟡" : "🟢";
+    list.innerHTML += `<p>${color} ${ingredients[k]}: <b>${amount}</b></p>`;
+  });
+
+  const buys = document.getElementById("buyButtons");
+  buys.innerHTML = "";
+  Object.keys(ingredients).forEach(k=>{
+    const b = document.createElement("button");
+    b.textContent = `${ingredients[k]} +10 — ${ingredientPrices[k]} 🪙`;
+    b.onclick = () => buyIngredient(k);
+    buys.appendChild(b);
+  });
+}
+
+function renderProfile(){
+  document.getElementById("profileText").innerHTML = `
+    <p>🌙 День: <b>${game.day}</b></p>
+    <p>💰 Монеты: <b>${game.coins}</b></p>
+    <p>✨ XP: <b>${game.xp}/${game.level*100}</b></p>
+    <p>✅ Заказы: <b>${game.orders}</b></p>
+    <p>❌ Ошибки: <b>${game.fails}</b></p>
+    <p>🔥 Рекорд серии: <b>${game.bestStreak}</b></p>
+    <p>📈 Всего заработано: <b>${game.totalEarned}</b></p>
+    <p>🔥 Кухня: ур. ${game.kitchen}</p>
+    <p>🙂 Кассир: ур. ${game.cashier}</p>
+    <p>📣 Реклама: ур. ${game.ads}</p>
+    <p>📦 Склад: ур. ${game.storage}</p>
+  `;
+  document.getElementById("questsText").innerHTML = `
+    <p>${game.orders >= 10 ? "✅" : "⬜"} Выполни 10 заказов: ${game.orders}/10</p>
+    <p>${game.level >= 5 ? "✅" : "⬜"} Достигни 5 уровня: ${game.level}/5</p>
+    <p>${game.rep >= 80 ? "✅" : "⬜"} Репутация 80: ${game.rep}/80</p>
+    <p>${game.bestStreak >= 10 ? "✅" : "⬜"} Серия 10: ${game.bestStreak}/10</p>
+    <p>${game.coins >= 5000 ? "✅" : "⬜"} Накопи 5000 монет: ${game.coins}/5000</p>
+  `;
+}
+
+function renderOrder(){
+  const box = document.getElementById("activeOrder");
+  if(!game.active){ box.classList.add("hidden"); box.innerHTML = ""; return; }
+  box.classList.remove("hidden");
+  const left = Math.max(0, game.active.expiresAt - Math.floor(Date.now()/1000));
+  const percent = Math.max(0, Math.min(100, left / game.active.time * 100));
+  box.innerHTML = `
+    <h2>👤 Активный заказ</h2>
+    <p>${game.active.text}</p>
+    <div class="progress"><div style="width:${percent}%"></div></div>
+    <p>⏱ Осталось: <b>${left}</b> сек.</p>
+    <p>💰 Награда: <b>${game.active.reward}</b> 🪙 | ✨ XP: <b>${game.active.xp}</b></p>
+    <p>Выбрано:</p>
+    <div>${game.active.selected.length ? game.active.selected.map(x=>`<span class="badge">${x}</span>`).join("") : "<span class='small'>Пока ничего</span>"}</div>
+  `;
+}
+
+function renderAll(){ updateTop(); renderFoods(); renderStock(); renderProfile(); renderOrder(); saveGame(); }
+function randomChoice(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+
+function newCustomer(){
+  if(game.active){ alert("Сначала закончи текущий заказ."); return; }
+  const available = unlockedFoods();
+  const client = randomChoice(clients);
+  let count = Math.min(available.length, Math.floor(Math.random()*Math.min(5, 2+Math.floor(game.level/2)))+1);
+  const chosen = [];
+  while(chosen.length < count){
+    const f = randomChoice(available);
+    if(!chosen.includes(f)) chosen.push(f);
+  }
+
+  let reward = 0, xp = 0;
+  chosen.forEach(f => { reward += foods[f].price; xp += foods[f].xp; });
+  reward = Math.floor(reward * client.mult) + game.cashier*30 + game.ads*20;
+  xp += game.ads*8;
+
+  let time = client.time + game.kitchen*8;
+  const event = randomEventForOrder();
+  if(event){ reward += event.reward; xp += event.xp; time += event.time; }
+
+  game.active = {
+    client:client.name, need:chosen, selected:[], reward, xp, time,
+    expiresAt:Math.floor(Date.now()/1000)+time,
+    text:`${client.name} говорит: «${randomChoice(phrases)} ${chosen.join(", ")}»${event ? "<br><br>Событие: "+event.text : ""}`
+  };
+  renderAll();
+}
+
+function randomEventForOrder(){
+  const r = Math.random();
+  if(r < .12) return {text:"🔥 Час пик — меньше времени, больше денег", reward:120, xp:30, time:-15};
+  if(r < .22) return {text:"📸 Блогер снимает обзор", reward:90, xp:90, time:0};
+  if(r < .30) return {text:"💎 VIP-настроение", reward:180, xp:40, time:-5};
+  if(r < .38) return {text:"🎉 Фестиваль еды", reward:100, xp:80, time:5};
+  if(r < .45) return {text:"🌧 Дождь — клиент терпеливее", reward:40, xp:20, time:10};
+  return null;
+}
+
+function chooseFood(food){
+  if(!game.active){ alert("Сначала нажми Новый клиент."); return; }
+  if(orderExpired()) return;
+  game.active.selected.push(food);
+  renderAll();
+}
+
+function clearSelected(){ if(game.active){ game.active.selected = []; renderAll(); } }
+
+function orderExpired(){
+  if(!game.active) return false;
+  if(Math.floor(Date.now()/1000) > game.active.expiresAt){
+    game.active = null; game.fails++; game.streak = 0; game.rep = Math.max(0, game.rep-4);
+    alert("⏰ Время вышло! Клиент ушёл.");
+    renderAll(); return true;
+  }
+  return false;
+}
+
+function serveOrder(){
+  if(!game.active){ alert("Нет заказа."); return; }
+  if(orderExpired()) return;
+
+  const need = [...game.active.need].sort();
+  const selected = [...game.active.selected].sort();
+
+  if(JSON.stringify(need) !== JSON.stringify(selected)){
+    alert("❌ Неверный заказ!\nНужно: "+need.join(", ")+"\nТы выбрал: "+(selected.join(", ") || "ничего"));
+    game.active = null; game.fails++; game.streak = 0; game.rep = Math.max(0, game.rep-6);
+    renderAll(); return;
+  }
+
+  const required = {};
+  game.active.need.forEach(f=>{
+    Object.entries(foods[f].need).forEach(([ing,amount])=>{
+      required[ing]=(required[ing]||0)+amount;
+    });
+  });
+
+  for(const [ing,amount] of Object.entries(required)){
+    if((game.stock[ing]||0) < amount){ alert("📦 Не хватает: "+ingredients[ing]); return; }
+  }
+
+  Object.entries(required).forEach(([ing,amount])=>game.stock[ing]-=amount);
+
+  let tip = Math.floor(Math.random()*(40 + game.cashier*15));
+  let total = game.active.reward + tip;
+  if(game.streak >= 4) total += 100;
+
+  game.coins += total; game.totalEarned += total; game.xp += game.active.xp;
+  game.orders++; game.streak++; game.bestStreak = Math.max(game.bestStreak, game.streak);
+  game.rep = Math.min(100, game.rep+2);
+
+  alert(`✅ Заказ выполнен!\n+${total} монет\n+${game.active.xp} XP\nЧаевые: ${tip}`);
+  game.active = null;
+  levelUp(); endDayIfNeeded(); renderAll();
+}
+
+function levelUp(){
+  while(game.xp >= game.level*100){
+    game.xp -= game.level*100; game.level++; game.coins += 200;
+    alert("⭐ Новый уровень: "+game.level+"! +200 монет");
+  }
+}
+
+function endDayIfNeeded(){
+  if(game.orders > 0 && game.orders % 10 === 0){
+    const rent = 150 + game.day*40;
+    game.coins -= rent; game.day++;
+    alert("🌙 День завершён!\nАренда: -"+rent+"\nНовый день: "+game.day);
+  }
+}
+
+function buyIngredient(k){
+  const price = ingredientPrices[k];
+  if(game.coins < price){ alert("Не хватает монет."); return; }
+  game.coins -= price; game.stock[k] = (game.stock[k]||0)+10; renderAll();
+}
+
+function buyUpgrade(type){
+  const prices = {kitchen:500, cashier:700, ads:900, storage:1200};
+  const price = prices[type] * (game[type]+1);
+  if(game.coins < price){ alert("Нужно "+price+" монет."); return; }
+  game.coins -= price; game[type]++;
+  if(type === "storage"){ Object.keys(game.stock).forEach(k=>game.stock[k]+=5); }
+  alert("✅ Улучшение куплено!");
+  renderAll();
+}
+
+function usePromo(){
+  const code = document.getElementById("promoInput").value.trim().toUpperCase();
+  if(!promos[code]){ alert("Такого промокода нет."); return; }
+  if(game.usedPromos.includes(code)){ alert("Этот промокод уже использован."); return; }
+  const p = promos[code];
+  game.coins += p.coins;
+  Object.entries(p.stock).forEach(([k,v])=>game.stock[k]=(game.stock[k]||0)+v);
+  game.usedPromos.push(code);
+  alert("🎁 Промокод активирован!");
+  renderAll();
+}
+
+setInterval(()=>{ if(game.active) renderOrder(); }, 1000);
+renderAll();
+</script>
+</body>
+</html>
