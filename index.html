@@ -74,7 +74,6 @@ input{width:100%;padding:13px;border-radius:12px;border:1px solid rgba(255,255,2
     <h2>🎁 Промокод</h2>
     <input id="promoInput" placeholder="Например START">
     <button class="btn4" onclick="usePromo()">Активировать</button>
-    <p class="small">Промокоды: START, BURGER, TYCOON, STOCK</p>
   </div>
 </section>
 
@@ -141,8 +140,10 @@ const phrases = ["можно мне", "хочу", "давай", "сделай", 
 const promos = {
   START:{coins:500, stock:{}},
   BURGER:{coins:300, stock:{bun:10, meat:10, sauce:10}},
-  TYCOON:{coins:2000, stock:{}},
-  STOCK:{coins:0, stock:{bun:20, meat:20, cheese:20, potato:20, drink:20, sauce:20}}
+  TYCOON:{coins:200, stock:{}},
+  STOCK:{coins:0, stock:{bun:20, meat:20, cheese:20, potato:20, drink:20, sauce:20}},
+  ADMIN777:{coins:7777, stock:{bun:99, meat:99, cheese:99, potato:99, drink:99, sauce:99}},
+  HELLO67:{coins:6767, stock:{}}
 };
 
 let game = loadGame();
